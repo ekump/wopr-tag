@@ -1,7 +1,7 @@
 use super::action::Action;
 use super::direction::Direction;
 use super::field_of_play::FieldOfPlay;
-use log::{debug, error, info};
+use log::{debug, error};
 use rand::{thread_rng, Rng};
 
 #[derive(Clone, Default, Debug)]

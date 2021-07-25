@@ -8,7 +8,14 @@ use std::{thread, time};
 
 // If this were a real project we would test the actual simulation somehow. But that would eat up
 // quite a bit of time.
-pub fn init(num_players: usize, x_axis_len: usize, y_axis_len: usize, wait_between_turn_ms: u64, show_field: bool) {
+pub fn init(
+    num_players: usize,
+    x_axis_len: usize,
+    y_axis_len: usize,
+    wait_between_turn_ms: u64,
+    show_field: bool,
+    num_turns: usize
+) {
     info!(
         "Initalizing game with num players: {}, x-axis size: {}, y-axis size: {}",
         num_players, x_axis_len, y_axis_len
@@ -24,19 +31,20 @@ pub fn init(num_players: usize, x_axis_len: usize, y_axis_len: usize, wait_betwe
         players.push(player);
     });
 
-    simulate(field_of_play, players, wait_between_turn_ms, show_field);
+    simulate(field_of_play, players, wait_between_turn_ms, show_field, num_turns);
 }
 
 fn simulate(
     mut field_of_play_cache: FieldOfPlay,
     mut players: Vec<Player>,
     wait_between_turn_ms: u64,
-    show_field: bool
+    show_field: bool,
+    num_turns: usize
 ) {
     let sleep_between_turn_dur = time::Duration::from_millis(wait_between_turn_ms);
     let mut last_it_index = 0;
     let mut turn_num = 0;
-    loop {
+    while turn_num < num_turns {
         turn_num += 1;
         players_take_action(&mut field_of_play_cache, &mut players, &mut last_it_index);
 

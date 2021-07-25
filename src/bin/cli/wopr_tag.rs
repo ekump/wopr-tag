@@ -71,6 +71,17 @@ fn process_command_line() {
                 .default_value("250")
                 .validator(validate_wait)
         )
+        .arg(
+            Arg::with_name("num_turns")
+                .value_name("num_turns")
+                .help("how many turns players get to take")
+                .short("t")
+                .long("num-turns")
+                .required(false)
+                .takes_value(true)
+                .default_value("1000")
+                .validator(validate_num_turns)
+        )
         .get_matches();
 
     // Unwrapping here is safe because we have already validated the inputs via Clap's
@@ -80,10 +91,11 @@ fn process_command_line() {
     let y_size = matches.value_of("y_size").unwrap().parse::<usize>().unwrap();
     let wait = matches.value_of("wait_between_turn").unwrap().parse::<u64>().unwrap();
     let show_field = matches.value_of("show_field").unwrap().parse::<bool>().unwrap();
+    let num_turns = matches.value_of("num_turns").unwrap().parse::<usize>().unwrap();
 
     debug!(
-        "cli args - number_of_players: {}, x_size: {}, y_size: {}",
-        num_players, x_size, y_size
+        "cli args - number_of_players: {}, x_size: {}, y_size: {}, wait: {}, show_field: {}, num_turns: {}",
+        num_players, x_size, y_size, wait, show_field, num_turns
     );
 
     if x_size * y_size < num_players {
@@ -92,7 +104,7 @@ fn process_command_line() {
             num_players, x_size, y_size
         );
     } else {
-        wopr_tag::init(num_players, x_size, y_size, wait, show_field);
+        wopr_tag::init(num_players, x_size, y_size, wait, show_field, num_turns);
     }
 }
 
@@ -149,4 +161,21 @@ fn validate_bool(bool_str: String) -> Result<(), String> {
     }
 
     Err("Value must be true or false".to_owned())
+}
+
+fn validate_num_turns(turns: String) -> Result<(), String> {
+    let turns_parse_result = turns.parse::<usize>();
+
+    if let Ok(turns) = turns_parse_result {
+        if turns >= 10 {
+            return Ok(());
+        }
+    };
+
+    let err_msg = format!(
+        "the number of turns must be a valid integer between 10 - {} inclusive.",
+        usize::MAX
+    );
+
+    Err(err_msg)
 }
