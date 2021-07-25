@@ -57,6 +57,10 @@ fn players_take_action(field_of_play_cache: &mut FieldOfPlay, players: &mut Vec<
             .expect("Invalid player index when attempting to take action.");
         let player_name = player.name.to_owned();
         let (old_x, old_y) = player.get_location();
+        // We only set the last known it location here, instead of also when a new player is tagged
+        // to simulate a non-zero reaction time from the other players with regards to knowing who
+        // is it.
+        field_of_play_cache.set_last_known_it_location(old_x, old_y);
         let actions = player.take_action(&field_of_play_cache, *last_it_index);
         debug!(
             "player at index: {} is acting. old_x: {}, old_y: {}, actions: {:?}",

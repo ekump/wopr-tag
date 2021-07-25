@@ -9,19 +9,24 @@ pub struct Player {
     pub is_it: bool,
     pub name: String,
     x_coordinate: usize,
-    y_coordinate: usize
+    y_coordinate: usize,
+    risk_tolerance: f64
 }
 
 impl Player {
     pub fn new(index: usize, is_it: bool, field_of_play: &mut FieldOfPlay) -> Self {
         // Since we are calling init_pos right away it's likely safe to init the positions to 0
         // instead of using Option<usize>.
+        let mut rng = rand::thread_rng();
         let name = format!("p{}", index);
+        let mut risk_tolerance: f64 = rng.gen();
+        risk_tolerance = risk_tolerance * 100.0;
         let mut player = Player {
             name,
             is_it,
             x_coordinate: 0,
-            y_coordinate: 0
+            y_coordinate: 0,
+            risk_tolerance
         };
 
         player.init_position(field_of_play, index);
@@ -40,11 +45,14 @@ impl Player {
         while !found_pos {
             let rand_x = rng.gen_range(0..x_len);
             let rand_y = rng.gen_range(0..y_len);
-            info!("checking if x: {}, y: {} is available", rand_x, rand_y);
+            debug!("checking if x: {}, y: {} is available", rand_x, rand_y);
             found_pos = field_of_play.field[rand_y][rand_x].is_none();
             if found_pos {
                 self.set_location(rand_x, rand_y);
                 field_of_play.field[rand_y][rand_x] = Some(index);
+                if self.is_it {
+                    field_of_play.set_last_known_it_location(rand_x, rand_y);
+                }
             }
         }
     }
@@ -184,6 +192,15 @@ impl Player {
                 _ => unreachable!()
             };
 
+            // It is better to move than get stuck because we do not want to get closer to the it
+            // player. So we only try to find a new position that isn't closer to the it player if
+            // we have at least 100 retries remaining.
+            if self.is_new_coordinates_too_close_to_it_player(x_coordinate, y_coordinate, &field_of_play)
+                && retries_remaining > 100
+            {
+                found_location = false;
+            }
+
             // It is possible that players will get bunched up at the edge of the field and the
             // current player has nowhere to go. If this is the case then skip this player and let
             // the next one try to move.
@@ -195,6 +212,35 @@ impl Player {
         }
 
         (x_coordinate, y_coordinate)
+    }
+
+    // distance between two sets of points is d=sqrt(x2-x1)^2 + (y2-y1)^2. If the x and y input are
+    // closer to the it player than the player's current coordinates we return false. Using floats
+    // for calc instead of and arb precision type, like BigDecimal means we may have slightly less
+    // reliable results, but an argument can be made that this makes the agents more human-like.
+    fn is_new_coordinates_too_close_to_it_player(&self, x: usize, y: usize, field_of_play: &FieldOfPlay) -> bool {
+        let it_coordinates = field_of_play.get_last_known_it_location();
+        if let Some((it_x, it_y)) = it_coordinates {
+            let new_distance = (((it_x - x).pow(2) + (it_y - y).pow(2)) as f64).sqrt();
+            let current_distance =
+                (((it_x - self.x_coordinate).pow(2) + (it_y - self.y_coordinate).pow(2)) as f64).sqrt();
+            if new_distance < current_distance {
+                return self.is_new_distance_outside_risk_tolerance(new_distance, current_distance);
+            }
+        }
+
+        false
+    }
+
+    // players with greater risk tolerance take more risks. They're willing to move closer to the
+    // it player.
+    fn is_new_distance_outside_risk_tolerance(&self, new_distance: f64, current_distance: f64) -> bool {
+        let pct_chg = ((new_distance - current_distance).abs() / current_distance) * 100.0;
+        if pct_chg > self.risk_tolerance {
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -268,4 +314,59 @@ fn player_take_action_test() {
 
     assert_eq!(actions[0].action, ActionType::Tag);
     assert_eq!(actions[0].new_it_index, Some(2));
+}
+
+#[test]
+fn player_get_risk_tolerance_test() {
+    let mut field_of_play = FieldOfPlay::new(3, 3);
+    let mut player = Player::new(9, false, &mut field_of_play);
+
+    player.risk_tolerance = 17.0;
+
+    assert_eq!(player.get_risk_tolerance(), 17.0);
+}
+
+#[test]
+fn player_get_location_test() {
+    let mut field_of_play = FieldOfPlay::new(3, 3);
+    let mut player = Player::new(9, false, &mut field_of_play);
+
+    player.x_coordinate = 1;
+    player.y_coordinate = 2;
+
+    assert_eq!(player.get_location(), (1, 2));
+}
+
+#[test]
+// Normally, you would not test private functions like this. But, for the purposes of this exercise
+// we will for now due to time constraints
+fn is_new_coordinates_too_close_test() {
+    let mut field_of_play = FieldOfPlay::new(3, 3);
+    let mut player = Player::new(1, false, &mut field_of_play);
+    let mut it_player = Player::new(2, true, &mut field_of_play);
+    player.risk_tolerance = 10.0;
+    it_player.x_coordinate = 2;
+    it_player.y_coordinate = 2;
+    field_of_play.set_last_known_it_location(it_player.x_coordinate, it_player.y_coordinate);
+
+    // test moving away from it
+    player.x_coordinate = 2;
+    player.y_coordinate = 1;
+
+    assert_eq!(
+        field_of_play.get_last_known_it_location(),
+        Some((it_player.x_coordinate, it_player.y_coordinate))
+    );
+    assert!(!player.is_new_coordinates_too_close_to_it_player(0, 0, &field_of_play));
+
+    // test moving closer but within tolerance
+    player.x_coordinate = 0;
+    player.y_coordinate = 0;
+    assert!(player.is_new_coordinates_too_close_to_it_player(0, 1, &field_of_play));
+
+    // test moving closer but outside tolerance
+    player.x_coordinate = 0;
+    player.y_coordinate = 0;
+    player.risk_tolerance = 25.0;
+    assert!(!player.is_new_coordinates_too_close_to_it_player(0, 1, &field_of_play));
 }

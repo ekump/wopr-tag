@@ -8,7 +8,8 @@ static GENERIC_VEC_ACCESS_PANIC_ERR_MSG: &str = "Invalid field index.";
 
 #[derive(Debug)]
 pub struct FieldOfPlay {
-    pub field: Field
+    pub field: Field,
+    last_known_it_coordinates: Option<(usize, usize)>
 }
 
 #[derive(Default)]
@@ -31,7 +32,10 @@ impl FieldOfPlay {
             field_of_play.push(x_vec);
         });
 
-        FieldOfPlay { field: field_of_play }
+        FieldOfPlay {
+            field: field_of_play,
+            last_known_it_coordinates: None
+        }
     }
 
     /// Returns a vec of player indices that are adjacent to the input coordinates. This can be
@@ -90,6 +94,14 @@ impl FieldOfPlay {
             Direction::SouthWest => self.is_position_valid_and_get_occupant_south_west(x, y).can_move_to(),
             Direction::West => self.is_position_valid_and_get_occupant_west(x, y).can_move_to()
         }
+    }
+
+    pub fn set_last_known_it_location(&mut self, x: usize, y: usize) {
+        self.last_known_it_coordinates = Some((x, y));
+    }
+
+    pub fn get_last_known_it_location(&self) -> Option<(usize, usize)> {
+        self.last_known_it_coordinates
     }
 
     fn is_position_valid_and_get_occupant_south(&self, x: usize, y: usize) -> PositionDetails {
@@ -298,4 +310,12 @@ fn field_is_position_valid_and_empty_test() {
     assert!(field_of_play.is_position_valid_and_empty(Direction::NorthWest, 1, 1));
     assert!(field_of_play.is_position_valid_and_empty(Direction::SouthEast, 1, 1));
     assert!(field_of_play.is_position_valid_and_empty(Direction::SouthWest, 1, 1));
+}
+
+#[test]
+fn field_last_known_it_position_test() {
+    let mut field_of_play = FieldOfPlay::new(3, 3);
+    assert_eq!(field_of_play.get_last_known_it_location(), None);
+    field_of_play.set_last_known_it_location(3, 4);
+    assert_eq!(field_of_play.get_last_known_it_location(), Some((3, 4)));
 }
