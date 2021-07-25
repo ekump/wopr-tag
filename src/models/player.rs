@@ -57,6 +57,10 @@ impl Player {
         }
     }
 
+    pub fn get_risk_tolerance(&self) -> f64 {
+        self.risk_tolerance
+    }
+
     /// Looks at the field of play and takes at least one action. If the player is not it, it will
     /// attempt to move. If the player is it, it will attempt to tag any nearby players and also
     /// move. The tag action will only occur before the move action. If a player is it, does not

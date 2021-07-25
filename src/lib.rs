@@ -4,6 +4,7 @@ mod renderer;
 use models::action::ActionType;
 use models::field_of_play::FieldOfPlay;
 use models::player::Player;
+use models::stats::Stats;
 use std::{thread, time};
 
 // If this were a real project we would test the actual simulation somehow. But that would eat up
@@ -44,9 +45,15 @@ fn simulate(
     let sleep_between_turn_dur = time::Duration::from_millis(wait_between_turn_ms);
     let mut last_it_index = 0;
     let mut turn_num = 0;
+    let mut stats = Stats::new(
+        &players,
+        num_turns,
+        field_of_play_cache.field[0].len(),
+        field_of_play_cache.field.len()
+    );
     while turn_num < num_turns {
         turn_num += 1;
-        players_take_action(&mut field_of_play_cache, &mut players, &mut last_it_index);
+        players_take_action(&mut field_of_play_cache, &mut players, &mut last_it_index, &mut stats);
 
         if show_field {
             renderer::render_field(&field_of_play_cache, &players, turn_num);
@@ -54,9 +61,15 @@ fn simulate(
 
         thread::sleep(sleep_between_turn_dur);
     }
+    stats.output_stats_about_players();
 }
 
-fn players_take_action(field_of_play_cache: &mut FieldOfPlay, players: &mut Vec<Player>, last_it_index: &mut usize) {
+fn players_take_action(
+    field_of_play_cache: &mut FieldOfPlay,
+    players: &mut Vec<Player>,
+    last_it_index: &mut usize,
+    stats: &mut Stats
+) {
     let generic_action_panic_msg = "Invalid action param";
 
     for player_index in 0..players.len() {
@@ -64,6 +77,7 @@ fn players_take_action(field_of_play_cache: &mut FieldOfPlay, players: &mut Vec<
             .get_mut(player_index)
             .expect("Invalid player index when attempting to take action.");
         let player_name = player.name.to_owned();
+        stats.record_start_player_details(&player);
         let (old_x, old_y) = player.get_location();
         // We only set the last known it location here, instead of also when a new player is tagged
         // to simulate a non-zero reaction time from the other players with regards to knowing who
@@ -85,6 +99,7 @@ fn players_take_action(field_of_play_cache: &mut FieldOfPlay, players: &mut Vec<
                     .get_mut(action.new_it_index.expect(generic_action_panic_msg))
                     .expect("Invalid player index when attempting to tag player");
                 new_tagged_player.is_it = true;
+                stats.record_new_it_details(new_tagged_player.name.to_owned());
                 *last_it_index = player_index;
                 info!("{} has tagged {}", player_name, new_tagged_player.name);
             }
