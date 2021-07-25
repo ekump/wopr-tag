@@ -1,0 +1,19 @@
+[package]
+name = "wopr-tag"
+version = "0.1.0"
+edition = "2018"
+authors = ["Edmund Kump"]
+
+[dependencies]
+clap = "~2"
+log = "~0.4"
+rand = "~0.8"
+simple_logger = "~1.3"
+
+[[bin]]
+name = "wopr_tag"
+path = "src/bin/cli/wopr_tag.rs"
+
+[lib]
+name = "wopr_tag"
+path= "src/lib.rs"
