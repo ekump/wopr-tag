@@ -1,55 +1,67 @@
 use super::action::Action;
 use super::direction::Direction;
 use super::field_of_play::FieldOfPlay;
+use crate::SharedFieldOfPlay;
 use log::{debug, error};
 use rand::{thread_rng, Rng};
+use std::{thread, time};
 
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Debug)]
 pub struct Player {
+    pub id: usize,
     pub is_it: bool,
     pub name: String,
     x_coordinate: usize,
     y_coordinate: usize,
-    risk_tolerance: f64
+    risk_tolerance: f64,
+    field_of_play: SharedFieldOfPlay,
+    speed: u64 // denotes how long we sleep between taking actions
 }
 
 impl Player {
-    pub fn new(index: usize, is_it: bool, field_of_play: &mut FieldOfPlay) -> Self {
+    pub fn new(index: usize, is_it: bool, field_of_play: SharedFieldOfPlay) -> Self {
         // Since we are calling init_pos right away it's likely safe to init the positions to 0
         // instead of using Option<usize>.
         let mut rng = rand::thread_rng();
         let name = format!("p{}", index);
         let mut risk_tolerance: f64 = rng.gen();
         risk_tolerance = risk_tolerance * 100.0;
+        let rand_sleep = rng.gen_range(0..100);
+        let speed = 200 - rand_sleep;
         let mut player = Player {
             name,
+            id: index,
             is_it,
             x_coordinate: 0,
             y_coordinate: 0,
-            risk_tolerance
+            risk_tolerance,
+            field_of_play,
+            speed
         };
 
-        player.init_position(field_of_play, index);
+        player.init_position();
 
         player
     }
 
     // Looks at the field of play and returns a starting position. It sets the position for the
     // player but the [FieldOfPlay] must be updated with the returned coordinates.
-    fn init_position(&mut self, field_of_play: &mut FieldOfPlay, index: usize) {
+    fn init_position(&mut self) {
+        let mut field_of_play = self.field_of_play.lock().expect("TODO");
         let y_len = field_of_play.field.len();
         let x_len = field_of_play.field[0].len();
         let mut rng = thread_rng();
         let mut found_pos = false;
-
+        let id = self.id;
         while !found_pos {
             let rand_x = rng.gen_range(0..x_len);
             let rand_y = rng.gen_range(0..y_len);
             debug!("checking if x: {}, y: {} is available", rand_x, rand_y);
             found_pos = field_of_play.field[rand_y][rand_x].is_none();
             if found_pos {
-                self.set_location(rand_x, rand_y);
-                field_of_play.field[rand_y][rand_x] = Some(index);
+                field_of_play.field[rand_y][rand_x] = Some(id);
+                self.x_coordinate = rand_x;
+                self.y_coordinate = rand_y;
                 if self.is_it {
                     field_of_play.set_last_known_it_location(rand_x, rand_y);
                 }
@@ -59,6 +71,28 @@ impl Player {
 
     pub fn get_risk_tolerance(&self) -> f64 {
         self.risk_tolerance
+    }
+
+    pub async fn simulate(&mut self) {
+        loop {
+            debug!("Player: {} is taking action", self.name);
+            // let mut rng = rand::thread_rng();
+            // let rand_wait = rng.gen_range(0..100);
+            // let sleep_between_turn_dur = time::Duration::from_millis(100);
+            tokio::time::sleep(tokio::time::Duration::from_millis(self.speed)).await;
+            // TODO: Fix this
+            {
+                let mut field_of_play = self.field_of_play.lock().expect("TODO");
+                let (old_x, old_y) = self.get_location();
+
+                // TODO: temp
+                let action = self.take_move_action(&field_of_play);
+                self.x_coordinate = action.x_coordinate.expect("TODO");
+                self.y_coordinate = action.y_coordinate.expect("TODO");
+                field_of_play.field[old_y][old_x] = None;
+                field_of_play.field[self.y_coordinate][self.x_coordinate] = Some(self.id);
+            }
+        }
     }
 
     /// Looks at the field of play and takes at least one action. If the player is not it, it will
@@ -87,9 +121,9 @@ impl Player {
         taggable_players
     }
 
-    fn take_move_action(&mut self, field_of_play: &FieldOfPlay) -> Action {
+    fn take_move_action(&self, field_of_play: &FieldOfPlay) -> Action {
         let (x, y) = self.move_to_empty_position(field_of_play);
-        self.set_location(x, y);
+        // self.set_location(x, y);
 
         Action::new_move(x, y)
     }
