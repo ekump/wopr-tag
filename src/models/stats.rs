@@ -24,7 +24,7 @@ impl Stats {
             player_stats.insert(
                 player.name.to_owned(),
                 PlayerStats {
-                    risk_tolerance: player.get_risk_tolerance(),
+                    risk_tolerance: player.risk_tolerance,
                     rounds_started_as_it: 0,
                     rounds_made_it: 0
                 }

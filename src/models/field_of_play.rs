@@ -10,8 +10,8 @@ static GENERIC_VEC_ACCESS_PANIC_ERR_MSG: &str = "Invalid field index.";
 pub struct FieldOfPlay {
     pub field: Field,
     last_known_it_coordinates: Option<(usize, usize)>,
-    pub last_known_it_index: usize,
-    pub prev_it_index: usize
+    pub last_known_it_id: usize,
+    pub prev_it_id: usize
 }
 
 #[derive(Default)]
@@ -37,8 +37,8 @@ impl FieldOfPlay {
         FieldOfPlay {
             field: field_of_play,
             last_known_it_coordinates: None,
-            last_known_it_index: 0, // TODO: FIX THIS
-            prev_it_index: 0 // TODO: FIX THIS
+            last_known_it_id: 0, // TODO: FIX THIS
+            prev_it_id: 0 // TODO: FIX THIS
         }
     }
 

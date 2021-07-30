@@ -2,9 +2,8 @@ use super::action::Action;
 use super::direction::Direction;
 use super::field_of_play::FieldOfPlay;
 use crate::SharedFieldOfPlay;
-use log::{debug, error};
+use log::{debug, error, info};
 use rand::{thread_rng, Rng};
-use std::{thread, time};
 
 #[derive(Clone, Debug)]
 pub struct Player {
@@ -13,7 +12,7 @@ pub struct Player {
     pub name: String,
     x_coordinate: usize,
     y_coordinate: usize,
-    risk_tolerance: f64,
+    pub risk_tolerance: f64,
     field_of_play: SharedFieldOfPlay,
     speed: u64 // denotes how long we sleep between taking actions
 }
@@ -69,21 +68,27 @@ impl Player {
         }
     }
 
-    pub fn get_risk_tolerance(&self) -> f64 {
-        self.risk_tolerance
-    }
-
     pub async fn simulate(&mut self) {
         loop {
             debug!("Player: {} is taking action", self.name);
-            // let mut rng = rand::thread_rng();
-            // let rand_wait = rng.gen_range(0..100);
-            // let sleep_between_turn_dur = time::Duration::from_millis(100);
             tokio::time::sleep(tokio::time::Duration::from_millis(self.speed)).await;
             // TODO: Fix this
             {
                 let mut field_of_play = self.field_of_play.lock().expect("TODO");
                 let (old_x, old_y) = self.get_location();
+
+                if field_of_play.last_known_it_id == self.id && !self.is_it {
+                    self.is_it = true;
+                }
+
+                if self.is_it {
+                    if let Some(newly_tagged_id) = self.get_taggable_player(&field_of_play) {
+                        self.is_it = false;
+                        field_of_play.last_known_it_id = newly_tagged_id;
+                        field_of_play.prev_it_id = self.id;
+                        info!("{} is now it", newly_tagged_id);
+                    }
+                }
 
                 // TODO: temp
                 let action = self.take_move_action(&field_of_play);
@@ -95,27 +100,9 @@ impl Player {
         }
     }
 
-    /// Looks at the field of play and takes at least one action. If the player is not it, it will
-    /// attempt to move. If the player is it, it will attempt to tag any nearby players and also
-    /// move. The tag action will only occur before the move action. If a player is it, does not
-    /// tag anyone, and moves to a new position where they are able to tag another player they must
-    /// wait until their next turn.
-    pub fn take_action(&mut self, field_of_play: &FieldOfPlay, last_it_index: usize) -> Vec<Action> {
-        let mut actions: Vec<Action> = Vec::new();
-        if self.is_it {
-            if let Some(newly_tagged_index) = self.get_taggable_player(field_of_play, last_it_index) {
-                self.is_it = false;
-                actions.push(Action::new_tag(newly_tagged_index));
-            }
-        }
-        actions.push(self.take_move_action(field_of_play));
-
-        actions
-    }
-
-    fn get_taggable_player(&self, field_of_play: &FieldOfPlay, last_it_index: usize) -> Option<usize> {
+    fn get_taggable_player(&self, field_of_play: &FieldOfPlay) -> Option<usize> {
         let adjacent_players = field_of_play.get_adjacent_player_indices(self.x_coordinate, self.y_coordinate);
-        let taggable_players = adjacent_players.into_iter().find(|ap| *ap != last_it_index);
+        let taggable_players = adjacent_players.into_iter().find(|ap| *ap != field_of_play.last_known_it_id);
         debug!("Taggable player indices adjacent to {:?}: {:?}", self, taggable_players);
 
         taggable_players

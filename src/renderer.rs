@@ -1,12 +1,9 @@
-use crate::models::player::Player;
-use crate::FieldOfPlay;
 use crate::SharedFieldOfPlay;
-use rand::{thread_rng, Rng};
 use std::{thread, time};
 use log::debug;
 
 // This is very rudimentary but gets the job done for now
-pub fn render_field(shared_field_of_play: SharedFieldOfPlay) {
+pub fn render_field(shared_field_of_play: SharedFieldOfPlay, refresh_interval: u64) {
     loop {
         {
             let field_of_play = shared_field_of_play.try_lock();
@@ -19,7 +16,7 @@ pub fn render_field(shared_field_of_play: SharedFieldOfPlay) {
                         y_axis.iter().for_each(|x_axis_element| {
                             let x_axis_element = match x_axis_element {
                                 Some(player_index) => {
-                                        if player_index == &field_of_play.last_known_it_index {
+                                        if player_index == &field_of_play.last_known_it_id {
                                             "*"
                                         } else {
                                             "P"
@@ -39,7 +36,7 @@ pub fn render_field(shared_field_of_play: SharedFieldOfPlay) {
                 }
             }
         } 
-        let sleep_between_turn_dur = time::Duration::from_millis(250);
+        let sleep_between_turn_dur = time::Duration::from_millis(refresh_interval);
         thread::sleep(sleep_between_turn_dur);
     }
 }
